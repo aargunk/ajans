@@ -22,8 +22,9 @@ export default function AyarlarPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null); // { type: "ok" | "err", text }
 
-  const [newFeed, setNewFeed] = useState({ name: "", url: "" });
+  const [newFeed, setNewFeed] = useState({ name: "", url: "", foreign: false });
   const [editFeed, setEditFeed] = useState(null); // { id, name }
+  const [newHtml, setNewHtml] = useState({ name: "", url: "", linkPattern: "", defaultCategory: "", foreign: false });
   const [newCat, setNewCat] = useState({ label: "", keywords: "" });
   const [editCat, setEditCat] = useState(null); // { id, label, keywords }
   const [newAuthor, setNewAuthor] = useState("");
@@ -102,7 +103,7 @@ export default function AyarlarPage() {
     );
   }
 
-  const { feeds = [], categories, authors, columnists, posts } = data;
+  const { feeds = [], htmlSources = [], categories, authors, columnists, posts } = data;
 
   return (
     <main className="page" style={{ maxWidth: 860 }}>
@@ -128,7 +129,7 @@ export default function AyarlarPage() {
           run("runCollect", {}, (d) => {
             const r = d.collectResult || {};
             const errs = (r.hatalar || []).length;
-            return `Güncellendi: ${r.yeniHaber ?? 0} yeni haber, toplam ${r.toplamHaber ?? 0}; ${r.secmeKoseYazisi ?? 0} seçme köşe yazısı.${errs ? ` (${errs} kaynak okunamadı)` : ""}`;
+            return `Güncellendi: ${r.yeniHaber ?? 0} yeni haber, toplam ${r.toplamHaber ?? 0}; ${r.secmeKoseYazisi ?? 0} seçme köşe yazısı; ${r.cevrilen ?? 0} haber Türkçeye çevrildi.${errs ? ` (${errs} kaynakta sorun var)` : ""}`;
           })
         }>{busy ? "Çalışıyor…" : "↻ Şimdi güncelle"}</button>
       </section>
@@ -153,11 +154,16 @@ export default function AyarlarPage() {
             ) : (
               <>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{f.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {f.name}{f.foreign && <span className="tag" style={{ marginLeft: 6 }}>çevrilecek</span>}
+                  </div>
                   <div style={{ fontSize: 11.5, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.url}</div>
                 </div>
                 <div className="row" style={{ flexShrink: 0 }}>
                   <button className="btn-ghost" onClick={() => setEditFeed({ id: f.id, name: f.name })}>Adını değiştir</button>
+                  <button className="btn-ghost" disabled={busy} onClick={() => run("toggleFeedForeign", { id: f.id })}>
+                    {f.foreign ? "Türkçe kaynak yap" : "Yabancı dil"}
+                  </button>
                   <button className="btn-ghost btn-danger" disabled={busy} onClick={() => {
                     if (confirm(`"${f.name}" kaynağı kaldırılsın mı?`)) run("deleteFeed", { id: f.id }, "Kaynak kaldırıldı");
                   }}>Kaldır</button>
@@ -172,10 +178,70 @@ export default function AyarlarPage() {
             onChange={(e) => setNewFeed({ ...newFeed, url: e.target.value })} />
           <input className="field" placeholder="Görünecek ad (boş bırakabilirsin, örn. Milliyet - Spor)" value={newFeed.name}
             onChange={(e) => setNewFeed({ ...newFeed, name: e.target.value })} />
+          <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center", color: "var(--muted)" }}>
+            <input type="checkbox" checked={newFeed.foreign} onChange={(e) => setNewFeed({ ...newFeed, foreign: e.target.checked })} />
+            Bu kaynak yabancı dilde: başlığı Türkçeye çevir ve kısa özet ekle
+          </label>
           <button className="btn" style={{ justifySelf: "start" }} disabled={busy || !newFeed.url.trim()}
             onClick={() => run("addFeed", newFeed, "Kaynak eklendi. Haberlerini çekmek için 'Şimdi güncelle'ye bas.",
               () => setNewFeed({ name: "", url: "" }))}>
             {busy ? "Adres kontrol ediliyor…" : "+ Kaynak ekle"}
+          </button>
+        </div>
+      </section>
+
+      {/* ---------------- RSS'SİZ SİTELER ---------------- */}
+      <section className="panel">
+        <h2 className="headline-font">RSS'siz Siteler</h2>
+        <p className="hint">
+          RSS yayınlamayan siteler için. Sayfadaki bağlantılardan, adresinde belirttiğin kalıbı taşıyanlar
+          haber olarak alınır (örn. Times Higher Education için adres
+          <code> https://www.timeshighereducation.com/academic/news</code>, kalıp <code>/news/, /depth/</code>).
+          Yayın tarihi okunamadığı için bir haber ilk görüldüğü gün listeye girer. Yalnızca başlık ve bağlantı alınır.
+        </p>
+        {htmlSources.map((h) => (
+          <div key={h.id} className="list-row">
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>
+                {h.name}{h.foreign && <span className="tag" style={{ marginLeft: 6 }}>çevrilecek</span>}
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {h.url}{h.linkPattern ? ` · kalıp: ${h.linkPattern}` : ""}
+                {h.defaultCategory ? ` · varsayılan: ${categories.find((c) => c.id === h.defaultCategory)?.label || h.defaultCategory}` : ""}
+              </div>
+            </div>
+            <div className="row" style={{ flexShrink: 0 }}>
+              <button className="btn-ghost" disabled={busy} onClick={() => run("toggleHtmlForeign", { id: h.id })}>
+                {h.foreign ? "Türkçe kaynak yap" : "Yabancı dil"}
+              </button>
+              <button className="btn-ghost btn-danger" disabled={busy} onClick={() => {
+                if (confirm(`"${h.name}" kaldırılsın mı?`)) run("deleteHtmlSource", { id: h.id }, "Site kaldırıldı");
+              }}>Kaldır</button>
+            </div>
+          </div>
+        ))}
+        <h3 className="headline-font" style={{ fontSize: 15, margin: "20px 0 10px" }}>Yeni site ekle</h3>
+        <div style={{ display: "grid", gap: 8, maxWidth: 560 }}>
+          <input className="field" placeholder="Site adı (örn. Times Higher Education)" value={newHtml.name}
+            onChange={(e) => setNewHtml({ ...newHtml, name: e.target.value })} />
+          <input className="field" placeholder="Haberlerin listelendiği sayfa adresi (https://…)" value={newHtml.url}
+            onChange={(e) => setNewHtml({ ...newHtml, url: e.target.value })} />
+          <input className="field" placeholder="Bağlantı kalıbı, virgülle ayır (örn. /news/, /depth/)" value={newHtml.linkPattern}
+            onChange={(e) => setNewHtml({ ...newHtml, linkPattern: e.target.value })} />
+          <select className="field" value={newHtml.defaultCategory} style={{ maxWidth: 320 }}
+            onChange={(e) => setNewHtml({ ...newHtml, defaultCategory: e.target.value })}>
+            <option value="">Anahtar kelime tutmazsa: alma</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>Tutmazsa şu kategoriye koy: {c.label}</option>)}
+          </select>
+          <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center", color: "var(--muted)" }}>
+            <input type="checkbox" checked={newHtml.foreign} onChange={(e) => setNewHtml({ ...newHtml, foreign: e.target.checked })} />
+            Bu site yabancı dilde: başlığı Türkçeye çevir ve kısa özet ekle
+          </label>
+          <button className="btn" style={{ justifySelf: "start" }} disabled={busy || !newHtml.name.trim() || !newHtml.url.trim()}
+            onClick={() => run("addHtmlSource", newHtml,
+              (d) => `Site eklendi. ${d.testResult || ""}`,
+              () => setNewHtml({ name: "", url: "", linkPattern: "", defaultCategory: "" }))}>
+            {busy ? "Sayfa deneniyor…" : "+ Site ekle"}
           </button>
         </div>
       </section>

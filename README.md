@@ -13,6 +13,7 @@ ve seçtiğimiz dış köşe yazarlarını gösteren Next.js uygulaması (Vercel
 |---|---|
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Upstash for Redis bağlanınca otomatik eklenir |
 | `ADMIN_PASSWORD` | Ayarlar sayfasının şifresi (sen belirlersin) |
+| `ANTHROPIC_API_KEY` | Yabancı dildeki haberlerin Türkçe başlık ve özeti için (isteğe bağlı; yoksa haberler özgün diliyle kalır) |
 | `CRON_SECRET` | İsteğe bağlı; tanımlıysa `/api/cron` yalnızca bu anahtarla çalışır |
 
 ## Zamanlama

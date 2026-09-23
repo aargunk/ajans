@@ -2,9 +2,10 @@
 import { kv, kvConfigured } from "../../../lib/kv-safe";
 import { isAdmin, adminConfigured, checkPassword, setAdminCookie, clearAdminCookie } from "../../../lib/auth";
 import {
-  KEYS, getCategories, getAuthors, getColumnists, getPosts, getFeeds, slugify,
+  KEYS, getCategories, getAuthors, getColumnists, getPosts, getFeeds, getHtmlSources, slugify,
 } from "../../../lib/settings";
 import { runCollect, parser } from "../../../lib/collect";
+import { fetchHtmlSource } from "../../../lib/scrape";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -16,10 +17,10 @@ const parseKeywords = (input) =>
     .filter(Boolean);
 
 async function state() {
-  const [feeds, categories, authors, columnists, posts] = await Promise.all([
-    getFeeds(), getCategories(), getAuthors(), getColumnists(), getPosts(),
+  const [feeds, htmlSources, categories, authors, columnists, posts] = await Promise.all([
+    getFeeds(), getHtmlSources(), getCategories(), getAuthors(), getColumnists(), getPosts(),
   ]);
-  return { feeds, categories, authors, columnists, posts };
+  return { feeds, htmlSources, categories, authors, columnists, posts };
 }
 
 const fail = (message, status = 400) => Response.json({ error: message }, { status });
@@ -70,7 +71,10 @@ export async function POST(request) {
         return fail("Bu adresten RSS okunamadı. Adresi kontrol et.");
       }
       if (!name) name = clean(parsed?.title, 80) || "Yeni kaynak";
-      await kv.set(KEYS.feeds, [...feeds, { id: Date.now().toString(36), name, url }]);
+      await kv.set(KEYS.feeds, [
+        ...feeds,
+        { id: Date.now().toString(36), name, url, foreign: Boolean(body.foreign) },
+      ]);
       break;
     }
     case "renameFeed": {
@@ -80,9 +84,49 @@ export async function POST(request) {
       await kv.set(KEYS.feeds, feeds.map((f) => (f.id === body.id ? { ...f, name } : f)));
       break;
     }
+    case "toggleFeedForeign": {
+      const feeds = await getFeeds();
+      await kv.set(KEYS.feeds, feeds.map((f) => (f.id === body.id ? { ...f, foreign: !f.foreign } : f)));
+      break;
+    }
     case "deleteFeed": {
       const feeds = await getFeeds();
       await kv.set(KEYS.feeds, feeds.filter((f) => f.id !== body.id));
+      break;
+    }
+
+    // ---------- RSS'SİZ SİTELER ----------
+    case "addHtmlSource": {
+      const name = clean(body.name, 80);
+      const url = clean(body.url, 500);
+      const linkPattern = clean(body.linkPattern, 200);
+      const defaultCategory = clean(body.defaultCategory, 60);
+      if (!name || !url) return fail("Site adı ve adres gerekli");
+      if (!/^https?:\/\//i.test(url)) return fail("Adres http:// veya https:// ile başlamalı");
+      let found;
+      try {
+        found = await fetchHtmlSource({ url, linkPattern });
+      } catch (err) {
+        return fail("Sayfa okunamadı: " + String(err).slice(0, 120));
+      }
+      if (found.length === 0) {
+        return fail("Sayfa okundu ama bu kalıba uyan haber bağlantısı bulunamadı. Bağlantı kalıbını kontrol et.");
+      }
+      const list = await getHtmlSources();
+      await kv.set(KEYS.htmlSources, [
+        ...list,
+        { id: Date.now().toString(36), name, url, linkPattern, defaultCategory, foreign: Boolean(body.foreign) },
+      ]);
+      return Response.json({ ...(await state()), testResult: `${found.length} haber bağlantısı bulundu. Örnek: ${found[0].title}` });
+    }
+    case "toggleHtmlForeign": {
+      const list = await getHtmlSources();
+      await kv.set(KEYS.htmlSources, list.map((h) => (h.id === body.id ? { ...h, foreign: !h.foreign } : h)));
+      break;
+    }
+    case "deleteHtmlSource": {
+      const list = await getHtmlSources();
+      await kv.set(KEYS.htmlSources, list.filter((h) => h.id !== body.id));
       break;
     }
 

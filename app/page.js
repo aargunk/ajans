@@ -16,6 +16,21 @@ function Thumb({ src, alt, style }) {
   return <img src={src} alt={alt} style={{ objectFit: "cover", borderRadius: 8, ...style }} />;
 }
 
+// Yabancı kaynaklarda Türkçe başlık büyük, özgün başlık altında küçük gösterilir.
+function Headline({ item, className, style }) {
+  const tr = item.titleTr;
+  return (
+    <>
+      <div className={className} style={style}>{tr || item.title}</div>
+      {tr && (
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4, fontStyle: "italic" }}>
+          {item.title}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default async function Page() {
   if (!kvConfigured) {
     return (
@@ -69,8 +84,8 @@ export default async function Page() {
             {leftList.map((item, i) => (
               <a key={item.link} href={item.link} target="_blank" rel="noreferrer">
                 <div className={`story${i % 2 === 1 ? " tinted" : ""}`}>
-                  <h3 className="headline-font">{item.title}</h3>
-                  <div className="meta">{item.source} · {formatDate(item.pubDate)}</div>
+                  <Headline item={item} className="headline-font" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.28 }} />
+                  <div className="meta" style={{ marginTop: 6 }}>{item.source} · {formatDate(item.pubDate)}</div>
                 </div>
               </a>
             ))}
@@ -79,8 +94,12 @@ export default async function Page() {
           {hero && (
             <a href={hero.link} target="_blank" rel="noreferrer">
               <Thumb src={hero.image} alt={hero.title} style={{ width: "100%", height: 320 }} />
-              <div className="headline-font" style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.18, marginTop: 16 }}>{hero.title}</div>
-              {hero.excerpt && <p style={{ fontSize: 16, marginTop: 10, lineHeight: 1.55 }}>{hero.excerpt}</p>}
+              <div style={{ marginTop: 16 }}>
+                <Headline item={hero} className="headline-font" style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.18 }} />
+              </div>
+              {(hero.summaryTr || hero.excerpt) && (
+                <p style={{ fontSize: 16, marginTop: 10, lineHeight: 1.55 }}>{hero.summaryTr || hero.excerpt}</p>
+              )}
               <div className="meta" style={{ marginTop: 6 }}>
                 {hero.source} · {formatDate(hero.pubDate)}
               </div>
@@ -92,7 +111,7 @@ export default async function Page() {
               <a key={item.link} href={item.link} target="_blank" rel="noreferrer">
                 <div className={`story${i % 2 === 1 ? " tinted" : ""}`} style={{ display: "flex", gap: 12 }}>
                   <Thumb src={item.image} alt={item.title} style={{ width: 88, height: 66, flexShrink: 0, borderRadius: 2 }} />
-                  <div className="headline-font" style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.28 }}>{item.title}</div>
+                  <div><Headline item={item} className="headline-font" style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.28 }} /></div>
                 </div>
               </a>
             ))}
@@ -165,7 +184,10 @@ export default async function Page() {
                   <div className="card">
                     <Thumb src={item.image} alt={item.title} style={{ width: "100%", height: 130, borderRadius: 0 }} />
                     <div style={{ padding: 12 }}>
-                      <div className="headline-font" style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3 }}>{item.title}</div>
+                      <Headline item={item} className="headline-font" style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3 }} />
+                      {item.summaryTr && (
+                        <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6, lineHeight: 1.45 }}>{item.summaryTr}</div>
+                      )}
                       <div className="meta" style={{ marginTop: 8, fontSize: 12 }}>
                         {item.source} · {formatDate(item.pubDate)}
                       </div>
@@ -191,7 +213,12 @@ export default async function Page() {
                 <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                   {overflow.map((item) => (
                     <li key={item.link + cat.id} style={{ padding: "9px 0", borderBottom: "1px solid var(--border)" }}>
-                      <a href={item.link} target="_blank" rel="noreferrer" className="headline-font u-hover" style={{ fontSize: 16, fontWeight: 700 }}>{item.title}</a>
+                      <a href={item.link} target="_blank" rel="noreferrer" className="headline-font u-hover" style={{ fontSize: 16, fontWeight: 700 }}>
+                        {item.titleTr || item.title}
+                      </a>
+                      {item.titleTr && (
+                        <div style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic", marginTop: 2 }}>{item.title}</div>
+                      )}
                       <div className="meta" style={{ marginTop: 3, fontSize: 12 }}>
                         {item.source} · {formatDate(item.pubDate)}
                       </div>
