@@ -13,7 +13,15 @@ async function api(action, payload = {}) {
   return data;
 }
 
-const emptyPost = { id: null, author: "", title: "", body: "" };
+const emptyPost = { id: null, author: "", title: "", body: "", type: "kose", reportCategory: "" };
+
+const REPORT_CATS = [
+  { id: "trend-raporlari", label: "Sektörel Trend Raporları" },
+  { id: "altyapi-rehberleri", label: "Altyapı & Satın Alma Rehberleri" },
+  { id: "kuresel-endeksler", label: "Küresel Endeks & Analizler" },
+  { id: "pazar-bultenleri", label: "Pazar & Yatırım Bültenleri" },
+];
+const reportLabel = (id) => REPORT_CATS.find((r) => r.id === id)?.label || id;
 
 export default function AyarlarPage() {
   const [phase, setPhase] = useState("loading"); // loading | login | ready | noconfig
@@ -132,6 +140,23 @@ export default function AyarlarPage() {
             return `Güncellendi: ${r.yeniHaber ?? 0} yeni haber, toplam ${r.toplamHaber ?? 0}; ${r.secmeKoseYazisi ?? 0} seçme köşe yazısı; ${r.cevrilen ?? 0} haber Türkçeye çevrildi.${errs ? ` (${errs} kaynakta sorun var)` : ""}`;
           })
         }>{busy ? "Çalışıyor…" : "↻ Şimdi güncelle"}</button>
+      </section>
+
+      {/* ---------------- EĞİTİM ŞABLONU ---------------- */}
+      <section className="panel">
+        <h2 className="headline-font">Eğitim şablonu</h2>
+        <p className="hint">
+          Panoyu tamamen eğitim odaklı hale getirir: kaynakları Türkiye'nin eğitim servisleri ile
+          Inside Higher Ed, EdSurge, eSchool News, The PIE News, THE Journal ve Times Higher Education
+          olarak değiştirir; kategorileri de Yükseköğretim, Sınav ve Tercih, Eğitim Teknolojisi,
+          Uluslararası Öğrenci, Eğitim Politikası, Sıralama ve Araştırma, Okullar olarak kurar.
+          Mevcut kaynak ve kategori listelerinin yerine geçer; köşe yazıları ve yazarlar etkilenmez.
+        </p>
+        <button className="btn" disabled={busy} onClick={() => {
+          if (confirm("Mevcut kaynak ve kategori listelerinin yerine eğitim şablonu kurulacak. Devam edilsin mi?")) {
+            run("applyEducationPreset", {}, "Eğitim şablonu kuruldu. Haberleri çekmek için 'Şimdi güncelle'ye bas.");
+          }
+        }}>Eğitim şablonunu uygula</button>
       </section>
 
       {/* ---------------- HABER KAYNAKLARI ---------------- */}
@@ -322,8 +347,12 @@ export default function AyarlarPage() {
 
       {/* ---------------- KENDİ YAZILARIMIZ ---------------- */}
       <section className="panel">
-        <h2 className="headline-font">Kendi Yazılarımız</h2>
-        <p className="hint">Paragrafları boş bir satırla ayır. Yazı ana sayfadaki "Köşe Yazıları" bölümünde görünür ve kendi sayfasında tam metin açılır.</p>
+        <h2 className="headline-font">Kendi Yazılarımız ve Raporlar</h2>
+        <p className="hint">
+          Paragrafları boş bir satırla ayır. Köşe yazıları ana sayfadaki "Köşe Yazıları" bölümünde,
+          raporlar ise "Raporlar, Trendler ve İncelemeler" bölümünde seçtiğin başlığın altında görünür.
+          İkisi de kendi sayfasında tam metin açılır.
+        </p>
 
         {posts.length > 0 && (
           <div style={{ marginBottom: 18 }}>
@@ -332,11 +361,12 @@ export default function AyarlarPage() {
                 <div>
                   <a href={`/yazi/${p.id}`} target="_blank" rel="noreferrer" style={{ fontWeight: 700, fontSize: 14 }}>{p.title}</a>
                   <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
-                    {p.author} · {new Date(p.createdAt).toLocaleDateString("tr-TR")}
+                    {p.type === "rapor" ? `Rapor · ${reportLabel(p.reportCategory)}` : "Köşe yazısı"}
+                    {" · "}{p.author} · {new Date(p.createdAt).toLocaleDateString("tr-TR")}
                   </div>
                 </div>
                 <div className="row" style={{ flexShrink: 0 }}>
-                  <button className="btn-ghost" onClick={() => { setPost({ id: p.id, author: p.author, title: p.title, body: p.body }); window.scrollTo({ top: document.getElementById("yazi-formu").offsetTop - 20, behavior: "smooth" }); }}>Düzenle</button>
+                  <button className="btn-ghost" onClick={() => { setPost({ id: p.id, author: p.author, title: p.title, body: p.body, type: p.type || "kose", reportCategory: p.reportCategory || "" }); window.scrollTo({ top: document.getElementById("yazi-formu").offsetTop - 20, behavior: "smooth" }); }}>Düzenle</button>
                   <button className="btn-ghost btn-danger" disabled={busy} onClick={() => {
                     if (confirm(`"${p.title}" silinsin mi?`)) run("deletePost", { id: p.id }, "Yazı silindi");
                   }}>Sil</button>
@@ -347,12 +377,26 @@ export default function AyarlarPage() {
         )}
 
         <h3 id="yazi-formu" className="headline-font" style={{ fontSize: 15, margin: "10px 0" }}>
-          {post.id ? "Yazıyı düzenle" : "Yeni yazı"}
+          {post.id ? "İçeriği düzenle" : "Yeni içerik"}
         </h3>
         {authors.length === 0 ? (
           <p className="hint">Yazı ekleyebilmek için önce yukarıdan en az bir yazar ekle.</p>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
+            <div className="row">
+              <select className="field" style={{ maxWidth: 200 }} value={post.type}
+                onChange={(e) => setPost({ ...post, type: e.target.value, reportCategory: "" })}>
+                <option value="kose">Köşe yazısı</option>
+                <option value="rapor">Rapor / inceleme</option>
+              </select>
+              {post.type === "rapor" && (
+                <select className="field" style={{ maxWidth: 320 }} value={post.reportCategory}
+                  onChange={(e) => setPost({ ...post, reportCategory: e.target.value })}>
+                  <option value="">Bölüm seç…</option>
+                  {REPORT_CATS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+              )}
+            </div>
             <select className="field" value={post.author} onChange={(e) => setPost({ ...post, author: e.target.value })} style={{ maxWidth: 320 }}>
               <option value="">Yazar seç…</option>
               {authors.map((a) => <option key={a} value={a}>{a}</option>)}
@@ -361,8 +405,8 @@ export default function AyarlarPage() {
             <textarea className="field" rows={12} placeholder="Yazının metni…" value={post.body}
               onChange={(e) => setPost({ ...post, body: e.target.value })} />
             <div className="row">
-              <button className="btn" disabled={busy || !post.author || !post.title.trim() || !post.body.trim()}
-                onClick={() => run("savePost", post, post.id ? "Yazı güncellendi" : "Yazı yayınlandı", () => setPost(emptyPost))}>
+              <button className="btn" disabled={busy || !post.author || !post.title.trim() || !post.body.trim() || (post.type === "rapor" && !post.reportCategory)}
+                onClick={() => run("savePost", post, post.id ? "İçerik güncellendi" : "İçerik yayınlandı", () => setPost(emptyPost))}>
                 {post.id ? "Değişiklikleri kaydet" : "Yayınla"}
               </button>
               {post.id && <button className="btn-ghost" onClick={() => setPost(emptyPost)}>Vazgeç</button>}

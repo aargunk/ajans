@@ -1,5 +1,5 @@
 import { safeGet, kvConfigured } from "../lib/kv-safe";
-import { getCategories, getPosts, getColumnItems, excerptOf } from "../lib/settings";
+import { getCategories, getPosts, getColumnItems, excerptOf, REPORT_CATEGORIES } from "../lib/settings";
 import { formatDate, initials } from "../lib/format";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,8 @@ export default async function Page() {
   const hero = items[0];
   const leftList = items.slice(1, 4);
   const rightList = items.slice(4, 8);
-  const ownPosts = posts.slice(0, 8);
+  const ownPosts = posts.filter((p) => (p.type || "kose") === "kose").slice(0, 8);
+  const reports = posts.filter((p) => p.type === "rapor");
 
   const hasOverflow = categories.some(
     (cat) => items.filter((i) => i.categories.includes(cat.id)).length > 10
@@ -166,6 +167,36 @@ export default async function Page() {
               </a>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ---------- RAPORLAR, TRENDLER VE İNCELEMELER ---------- */}
+      {reports.length > 0 && (
+        <section style={{ marginBottom: 44 }}>
+          <h2 className="headline-font section-title">Raporlar, Trendler ve İncelemeler</h2>
+          {REPORT_CATEGORIES.map((rc) => {
+            const list = reports.filter((p) => p.reportCategory === rc.id);
+            if (list.length === 0) return null;
+            return (
+              <div key={rc.id} style={{ marginBottom: 26 }}>
+                <div className="kicker" style={{ marginBottom: 4 }}>{rc.label}</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12, maxWidth: 720 }}>{rc.description}</div>
+                <div className="cat-scroll">
+                  {list.slice(0, 10).map((p) => (
+                    <a key={p.id} href={`/yazi/${p.id}`} className="cat-card" style={{ flexBasis: 300 }}>
+                      <div className="card" style={{ padding: 16, height: "100%" }}>
+                        <div className="headline-font" style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>{p.title}</div>
+                        <div style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>{excerptOf(p.body, 140)}</div>
+                        <div className="meta" style={{ marginTop: 10, fontSize: 12 }}>
+                          {p.author} · {formatDate(p.createdAt, false)}
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </section>
       )}
 

@@ -6,6 +6,7 @@ import {
 } from "../../../lib/settings";
 import { runCollect, parser } from "../../../lib/collect";
 import { fetchHtmlSource } from "../../../lib/scrape";
+import { EDUCATION_FEEDS, EDUCATION_HTML_SOURCES, EDUCATION_CATEGORIES, REPORT_CATEGORIES } from "../../../config/education-preset";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -216,22 +217,47 @@ export async function POST(request) {
       if (!author || !title || !text) return fail("Yazar, başlık ve metin gerekli");
       const authors = await getAuthors();
       if (!authors.includes(author)) return fail("Önce bu yazarı 'Kendi Yazarlarımız' listesine ekle");
+      const type = body.type === "rapor" ? "rapor" : "kose";
+      const reportCategory = type === "rapor" ? clean(body.reportCategory, 60) : "";
+      if (type === "rapor" && !REPORT_CATEGORIES.some((r) => r.id === reportCategory)) {
+        return fail("Rapor için bir bölüm seç");
+      }
       const posts = await getPosts();
       const now = new Date().toISOString();
       if (body.id) {
         await kv.set(
           KEYS.posts,
-          posts.map((p) => (p.id === body.id ? { ...p, author, title, body: text, updatedAt: now } : p))
+          posts.map((p) =>
+            p.id === body.id ? { ...p, author, title, body: text, type, reportCategory, updatedAt: now } : p
+          )
         );
       } else {
         const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        await kv.set(KEYS.posts, [{ id, author, title, body: text, createdAt: now, updatedAt: now }, ...posts]);
+        await kv.set(KEYS.posts, [
+          { id, author, title, body: text, type, reportCategory, createdAt: now, updatedAt: now },
+          ...posts,
+        ]);
       }
       break;
     }
     case "deletePost": {
       const posts = await getPosts();
       await kv.set(KEYS.posts, posts.filter((p) => p.id !== body.id));
+      break;
+    }
+
+    // ---------- EĞİTİM ŞABLONU ----------
+    case "applyEducationPreset": {
+      const stamp = Date.now();
+      await kv.set(
+        KEYS.feeds,
+        EDUCATION_FEEDS.map((f, i) => ({ id: `edu${stamp}-${i}`, ...f }))
+      );
+      await kv.set(
+        KEYS.htmlSources,
+        EDUCATION_HTML_SOURCES.map((h, i) => ({ id: `eduh${stamp}-${i}`, ...h }))
+      );
+      await kv.set(KEYS.categories, EDUCATION_CATEGORIES);
       break;
     }
 
